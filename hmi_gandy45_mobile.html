@@ -47,16 +47,21 @@
   @media (max-width: 760px) {
     #body { flex-direction: column; }
     #canvas-wrap { min-height: 0; }
-    #panel { flex: 0 0 auto; width: 100%; max-height: 34vh;
+    #panel { flex: 0 0 34vh; width: 100%; height: 34vh; max-height: 34vh;
       border-left: none; border-top: 1px solid var(--line); }
   }
 
+  /* Panel is a fixed-size sidebar, never user-resizable: on desktop a fixed
+     width, on mobile a fixed height (see media query above). This exists so
+     the canvas on the left always gets a stable box to fit the diagram into
+     -- if the panel could grow/shrink, the graph's fit-to-view zoom would
+     shift with it and the diagram could end up clipped, especially on phones. */
   #panel { flex: 0 0 340px; width: 340px; background: var(--surface);
     border-left: 1px solid var(--line); display: flex; flex-direction: column;
-    padding: 6px; gap: 6px; min-width: 0; }
+    padding: 6px; gap: 6px; min-width: 0; resize: none; overflow: hidden; }
   #list { flex: 1 1 auto; display: grid;
     grid-template-columns: 1fr 1fr; grid-auto-rows: 60px; gap: 6px;
-    overflow-y: auto; overflow-x: hidden; min-width: 0; }
+    overflow-y: auto; overflow-x: hidden; min-width: 0; resize: none; }
   .sw { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0;
     text-align: left; background: transparent; border: 1px solid transparent;
     border-radius: 7px; padding: 6px 8px; cursor: pointer; font: inherit;
@@ -1517,14 +1522,19 @@ function boot() {
     if (e.touches.length < 2) pinch = null;
   });
 
-  // re-frame on resize so the diagram stays framed through the mobile reflow
-  // (panel dropping below the canvas)
+  // re-frame whenever the canvas box actually changes size (rotation, mobile
+  // reflow, virtual keyboard). ResizeObserver on #canvas-wrap catches this
+  // directly -- the panel itself is fixed-size (CSS) and never triggers it.
   var refitPending = false;
-  window.addEventListener("resize", function () {
+  function requestRefit() {
     if (refitPending) return;
     refitPending = true;
     window.requestAnimationFrame(function () { refitPending = false; fitView(); });
-  });
+  }
+  window.addEventListener("resize", requestRefit);
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(requestRefit).observe(document.getElementById("canvas-wrap"));
+  }
 
   // ---------------- main loop ----------------
   function refreshDecor() {
